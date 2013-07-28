@@ -70,7 +70,7 @@ do
 done
 
 shift $(( $OPTIND - 1 ))
-[ "$is_extglob_set" ] || shopt -u extglob 
+[ "$is_extglob_set" ] || shopt -u extglob
 
 #
 # Verify options
@@ -86,9 +86,13 @@ shift $(( $OPTIND - 1 ))
 
 if [ -n "$append_flag" -o -n "$prepend_flag" ]
 then
-    old_description=$(curl -s --user "$USER:$PASSWORD" --data-urlencode "tree=description" \
+    old_description=$(curl -s --user "$USER:$PASSWORD" --data "tree=description" \
 	"$jenkins_url/job/$job_name/$build_number/api/json")
-    [ $? -ne 0 ] && error "Could not get description: $?"
+    if [ $? -ne 0 ]
+    then
+	echo "Could not retrieve old description of build" 1>&2
+	exit 2
+    fi
 fi
 old_description=${old_description#*:\"}	#Remove JSON garbage
 old_description=${old_description%\"\}}	#Remove JSON garbage
@@ -97,9 +101,11 @@ old_description=${old_description%\"\}}	#Remove JSON garbage
 # Translate linefeeds
 #
 old_description=$(sed "s/\\r\\n/\r\n/g" <<<$old_description)
-if [ $? -ne 0 ] && error "Description could not be modified"
-
-echo "Old Description = '$old_description'"
+if [ $? -ne 0 ]
+then
+    echo "ERROR: Could not modify the old description with 'sed' command" 1>&2
+    exit 2
+fi
 
 #
 # Create the new description
@@ -121,17 +127,32 @@ fi
 # Now set the description
 #
 
-if curl -u $USER:$PASSWORD   --data-urlencode "description=$new_description" \
-    --data-urlencode "Submit=Submit" \
-    "$jenkins_url/job/$job_name/$build_number/submitDescription"
+new_description=$(./url-encode.pl -input "$new_description")
+output=$( curl -s -u $USER:$PASSWORD --data "description=$new_description" --data "Submit=Submit" \
+    "$jenkins_url/job/$job_name/$build_number/submitDescription" 2>&1)
+if [ $? -ne 0 ]
 then
-    echo "Description successfully changed on Build #$build_number in Jenkins job $job_name"
-else
-    echo "WARNING: Description was not set. Manually change the descripiton of the build"
-    echo "         for Build #$build_number in Jenkins job $job_name"
+    echo "WARNING: Description was not set. Manually change the descripiton of the build" >&2
+    echo "         for Build #$build_number in Jenkins job $job_name" >&2
+    exit 2
 fi
-echo "The description appears below"
-echo "$new_description"
+
+#
+# If any "output" is returned by the curl command, it has failed
+#
+if [ -n "$output" ]
+then
+    error=$(sed -E 's/<[^>]*>//g' <<<"$output")
+    printf "There was some sort of error:\n%s\n", "$error" >&2
+    exit 2
+fi
+
+#
+# Everything worked out!
+#
+echo "Description successfully changed on Build #$build_number in Jenkins job $job_name"
+
+#
 #
 # DONE
 ########################################################################

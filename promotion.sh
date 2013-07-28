@@ -65,7 +65,7 @@ do
     esac
 done
 shift $(( $OPTIND - 1 ))
-[ "$is_extglob_set" ] || shopt -s extglob
+[ "$is_extglob_set" ] || shopt -u extglob
 
 #
 # Verify options
@@ -82,21 +82,42 @@ shift $(( $OPTIND - 1 ))
 #
 # Encode Promotion Name
 #
-promotion_name=$(sed -e 's/ /%20/g' -e 's/\!/%21/g' -e 's/"/%22/g' -e 's/#/%23/g' \
-      -e 's/\$/%24/g' -e 's/&/%26/g' -e 's/(/%28/g' -e 's/)/%29/g' \
-      -e 's/\*/%2A/g' -e 's/\+/%2B/g' -e 's/,/%2C/g' <<<$promotion_name)
+encoded_promotion_name=$(./url-encode.pl -input "$promotion_name");
 
-[ $? -ne 0 ] && error "Description could not be modified"
+if [ $? -ne 0 ]
+then
+    echo "ERROR: Promotion name '$promotion_name' Couldn't be URL encoded" 1>&2
+    exit 2
+fi
 
 #
 # Now do the promotion
 #
 
-output=$(curl -s -u "$USER:$PASSWORD" --data-urlencode "json={}" --data-urlencode "Submit=Approve" \
-    "$jenkins_url/job/$job_name/$build_number/$promotion_url/$promotion_name/$promotion_plugin_url/")
+output=$(curl -s -u "$USER:$PASSWORD" --data "json={}" --data "Submit=Approve" \
+    "$jenkins_url/job/$job_name/$build_number/$promotion_url/$encoded_promotion_name/$promotion_plugin_url/")
 
-error=$(sed -E 's/<[^>]*>//g' <<<"$output")
+if [ $? -ne 0 ]
+then
+    echo "ERROR: Could not execute 'curl' command or could not contact server '$jenkins_url'" 1>&2
+    exit 2
+fi
+
+#
+# If there was any text returned by the curl command, there was an error.
+#
 if [ -n "$output" ]
 then
-    printf "There was some sort of error:\n$error\n"
+    error=$(sed -E 's/<[^>]*>//g' <<<"$output")
+    printf "There was some sort of error:\n$error\n" 1>&2
+    exit 2
 fi
+
+#
+# Everything worked out!
+#
+echo "Build Successfully promoted"
+
+#
+# DONE
+########################################################################

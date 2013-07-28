@@ -65,7 +65,7 @@ do
     esac
 done
 shift $(( $OPTIND - 1 ))
-[ "$is_extglob_set" ] || shopt -s extglob
+[ "$is_extglob_set" ] || shopt -u extglob
 
 #
 # Verify options
@@ -95,7 +95,7 @@ status=${status%\}}
 
 if [ "$lock_flag" != "$status" ]
 then
-    output=$(curl -s -u $USER:$PASSWORD --data-urlencode 'json=""' --data-urlencode "Submit=$lock_flag" \
+    output=$(curl -s -u $USER:$PASSWORD --data 'json=""' --data "Submit=$lock_flag" \
 	"$jenkins_url/job/$job_name/$build_number/toggleLogKeep")
 else
     echo "Build lock status already set to '$lock_flag'. No action taken."
@@ -108,11 +108,23 @@ fi
 
 if [ $? -ne 0 ]
 then
-    echo "Error in changing Jenkins lock status: Job $job_name build #$build_number (Exit code: $?)"
+    echo "Error in changing Jenkins lock status: Job $job_name build #$build_number (Exit code: $?)" 1>&2
+    exit 2
 fi
     
 if [ -n "$output" ]
 then
     error=$(sed -E 's/<[^>]*>//g' <<<"$output")
-    printf "There was some sort of error:\n$error\n"
+    printf "There was some sort of error:\n$error\n" 1>&2
+    exit 2
 fi
+
+#
+# Everything worked out!
+#
+
+echo "Lock status successfully changed on the build. Lock Status = $lock_flag"
+
+#
+# DONE
+########################################################################
