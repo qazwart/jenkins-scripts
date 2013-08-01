@@ -68,7 +68,6 @@ do
 	*)  error "Invalid Argument";;
     esac
 done
-
 shift $(( $OPTIND - 1 ))
 [ "$is_extglob_set" ] || shopt -u extglob
 
@@ -94,8 +93,13 @@ then
 	exit 2
     fi
 fi
-old_description=${old_description#*:\"}	#Remove JSON garbage
-old_description=${old_description%\"\}}	#Remove JSON garbage
+if [ "$old_description" == '{"description":null}' ]
+then
+    old_description=""
+else
+    old_description=${old_description#*:\"}	#Remove JSON garbage
+    old_description=${old_description%\"\}}	#Remove JSON garbage
+fi
 
 #
 # Translate linefeeds
@@ -127,7 +131,7 @@ fi
 # Now set the description
 #
 
-new_description=$(./url-encode.pl -input "$new_description")
+new_description=$(perl url-encode.pl -input "$new_description")
 output=$( curl -s -u $USER:$PASSWORD --data "description=$new_description" --data "Submit=Submit" \
     "$jenkins_url/job/$job_name/$build_number/submitDescription" 2>&1)
 if [ $? -ne 0 ]
@@ -142,7 +146,7 @@ fi
 #
 if [ -n "$output" ]
 then
-    error=$(sed -E 's/<[^>]*>//g' <<<"$output")
+    error=$(sed 's/<[^>]*>//g' <<<"$output")
     printf "There was some sort of error:\n%s\n", "$error" >&2
     exit 2
 fi

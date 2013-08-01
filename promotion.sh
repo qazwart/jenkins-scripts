@@ -82,7 +82,7 @@ shift $(( $OPTIND - 1 ))
 #
 # Encode Promotion Name
 #
-encoded_promotion_name=$(./url-encode.pl -input "$promotion_name");
+encoded_promotion_name=$(perl url-encode.pl -input "$promotion_name");
 
 if [ $? -ne 0 ]
 then
@@ -108,7 +108,7 @@ fi
 #
 if [ -n "$output" ]
 then
-    error=$(sed -E 's/<[^>]*>//g' <<<"$output")
+    error=$(sed 's/<[^>]*>//g' <<<"$output")
     printf "There was some sort of error:\n$error\n" 1>&2
     exit 2
 fi

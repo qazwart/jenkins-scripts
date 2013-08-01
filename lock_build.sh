@@ -79,7 +79,7 @@ shift $(( $OPTIND - 1 ))
 # Get Curreent Lock Status
 #
 
-if ! status=$(curl -s -u $USER:$PASSWORD --data-urlencode "tree=keepLog" \
+if ! status=$(curl -s -u $USER:$PASSWORD --data "tree=keepLog" \
     "$jenkins_url/job/$job_name/$build_number/api/json")
 then
     echo "Cannot get status of current build"
@@ -114,7 +114,7 @@ fi
     
 if [ -n "$output" ]
 then
-    error=$(sed -E 's/<[^>]*>//g' <<<"$output")
+    error=$(sed 's/<[^>]*>//g' <<<"$output")
     printf "There was some sort of error:\n$error\n" 1>&2
     exit 2
 fi
